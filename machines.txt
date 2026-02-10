@@ -1,0 +1,3 @@
+10.4.21.19 server.kubernetes.local server
+10.4.21.20 node-0.kubernetes.local node-0 10.5.20.0/24
+10.4.21.21 node-1.kubernetes.local node-1 10.5.21.0/24
