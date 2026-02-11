@@ -171,6 +171,7 @@ curl -I http://node-1
 helm upgrade --install kyverno kyverno \
   --repo https://kyverno.github.io/kyverno/ \
   --namespace kyverno \
+  --create-namespace \
   --set admissionController.replicas=2 \
   --set features.policyExceptions.enabled=true
 ```
