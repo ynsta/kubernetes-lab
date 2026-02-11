@@ -205,3 +205,10 @@ Content-Length: 19
 ```
 
 This configuration can also be applied to the host machine, allowing you to access the nodes via the `*.klab.lan` DNS wildcard.
+
+
+## 📚 Examples
+
+Explore practical use cases for your Kubernetes lab:
+
+* **[App with Ingress](examples/app-with-ingress/README.md)**: Deploy a sample web application and expose it using Traefik and the `*.klab.lan` DNS wildcard.
