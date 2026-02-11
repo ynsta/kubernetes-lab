@@ -1,30 +1,29 @@
 # Kubernetes Lab - KVM/Libvirt
 
-Local Kubernetes development environment provisioned via Vagrant and Libvirt (KVM).
-Built on **Debian 13 (Trixie)**.
+A local Kubernetes development environment provisioned using Vagrant and Libvirt (KVM), built on **Debian 13 (Trixie)**.
 
 ## 🏗 Architecture
 
-The private network is configured on the **10.4.21.0/24** subnet.
+The environment uses a private network configured on the **10.4.21.0/24** subnet.
 
-| Machine    | Role                   | IP           | vCPU | RAM  | HDD  | OS        |
-|------------|------------------------|--------------|------|------|------|-----------|
-| **jumpbox**| Admin Host / Gateway   | `10.4.21.80` | 1    | 1GB  | 20GB | Debian 13 |
-| **server** | K8s Control Plane      | `10.4.21.19` | 2    | 4GB  | 40GB | Debian 13 |
-| **node-0** | K8s Worker             | `10.4.21.20` | 2    | 4GB  | 40GB | Debian 13 |
-| **node-1** | K8s Worker             | `10.4.21.21` | 2    | 4GB  | 40GB | Debian 13 |
+| Machine    | Role                 | IP           | vCPU | RAM  | HDD  | OS        |
+|------------|----------------------|--------------|------|------|------|-----------|
+| **jumpbox**| Administrative Host  | `10.4.21.80` | 1    | 1GB  | 20GB | Debian 13 |
+| **server** | K8s Control Plane    | `10.4.21.19` | 2    | 4GB  | 40GB | Debian 13 |
+| **node-0** | K8s Worker           | `10.4.21.20` | 2    | 4GB  | 40GB | Debian 13 |
+| **node-1** | K8s Worker           | `10.4.21.21` | 2    | 4GB  | 40GB | Debian 13 |
 
-> **Performance Note:** The CPU mode is set to `host-passthrough` to utilize native host processor instructions, ensuring near-native performance.
+> **Performance Note:** The CPU mode is set to `host-passthrough` to use native host processor instructions, ensuring near-native performance.
 
 ## 🚀 Quick Start
 
-Ensure you have `vagrant`, `libvirt` and the `vagrant-libvirt` plugin installed.
+Ensure that `vagrant`, `libvirt`, and the `vagrant-libvirt` plugin are installed.
 
 ```bash
-# 1. Launch the full environment (provisions all 4 VMs)
+# 1. Launch the full environment (provisions all 4 VMs):
 vagrant up
 
-# 2. Verify machines are running
+# 2. Verify that the machines are running:
 vagrant status
 
 ```
@@ -35,30 +34,29 @@ vagrant status
 
 | Action | Command | Description |
 | --- | --- | --- |
-| **Start** | `vagrant up` | Creates and configures VMs according to the Vagrantfile. |
-| **Stop** | `vagrant halt` | Gracefully shuts down the VMs (ACPI shutdown). |
-| **Restart** | `vagrant reload` | Reboots the VMs (useful after editing Vagrantfile). |
-| **Suspend** | `vagrant suspend` | Pauses the VMs (saves RAM state to disk). |
-| **Destroy** | `vagrant destroy` | Permanently deletes the VMs and their disks. |
+| **Start** | `vagrant up` | Creates and configures the VMs according to the Vagrantfile. |
+| **Stop** | `vagrant halt` | Gracefully shuts down the VMs. |
+| **Restart** | `vagrant reload` | Reboots the VMs (useful after editing the Vagrantfile). |
+| **Suspend** | `vagrant suspend` | Pauses the VMs (saves the RAM state to disk). |
+| **Destroy** | `vagrant destroy` | Permanently deletes the VMs and their associated disks. |
 
 ### Access & Debug
 
 | Action | Command | Description |
 | --- | --- | --- |
-| **Connect** | `vagrant ssh <name>` | SSH into a VM (e.g., `vagrant ssh server`). |
-| **SSH Config** | `vagrant ssh-config` | Outputs SSH configuration (keys/ports) for external tools. |
-| **Logs** | `vagrant global-status` | Lists all active Vagrant environments on the host. |
+| **Connect** | `vagrant ssh <name>` | Connects to a VM via SSH (e.g., `vagrant ssh server`). |
+| **SSH Config** | `vagrant ssh-config` | Outputs the SSH configuration (keys/ports) for use with external tools. |
+| **Logs** | `vagrant global-status` | Lists all active Vagrant environments on the host machine. |
 
 ## 🛠 Specific Configuration
 
 * **OS:** Uses Debian Testing (Trixie) to provide a recent kernel version.
-
-* **Network:** VMs communicate via the private libvirt network bridge.
+* **Network:** VMs communicate via a private libvirt network bridge.
 * **Forwarding:** IP forwarding is enabled by default to allow pod traffic routing.
 
 ## 📝 Usage Examples
 
-**1. Access the Control Plane:**
+**1. Accessing the Control Plane:**
 
 ```bash
 vagrant ssh server
@@ -66,7 +64,7 @@ vagrant ssh server
 cat /etc/os-release
 ```
 
-**2. Test Connectivity from Jumpbox:**
+**2. Testing Connectivity from the Jumpbox:**
 
 ```bash
 vagrant ssh jumpbox
@@ -76,15 +74,15 @@ ping 10.4.21.20
 
 ## Kubernetes Setup
 
-Follow [Kubernetes The Hard Way](https://github.com/ynsta/kubernetes-the-hard-way/tree/1.34.3) Guide
+Follow the [Kubernetes The Hard Way](https://github.com/ynsta/kubernetes-the-hard-way/tree/1.34.3) guide.
 
-A [`machines.txt`](machines.txt) file is provided to be used within this guide.
+A [`machines.txt`](machines.txt) file is provided for use with this guide.
 
-## Post install
+## Post-installation
 
-On jumpbox
+Perform the following steps on the `jumpbox`:
 
-### Setup krew plugin manager
+### Set up the Krew plugin manager
 
 ```bash
 (
@@ -101,9 +99,9 @@ echo 'export PATH="$PATH:${KREW_ROOT:-$HOME/.krew}/bin"' >> ~/.zshrc
 
 ```
 
-restart zsh
+Restart your shell (zsh) to apply changes.
 
-### Setup some useful plugins
+### Install useful plugins
 
 ```bash
 k krew update
@@ -114,24 +112,24 @@ k resource-capacity -u
 k view-allocations -u
 ```
 
-### Setup kubecolor
+### Install and configure kubecolor
 
 ```bash
-# kubecolor
+# Kubecolor
 wget -O /tmp/kubecolor.deb "https://kubecolor.github.io/packages/deb/pool/main/k/kubecolor/kubecolor_$(wget -q -O- https://kubecolor.github.io/packages/deb/version)_$(dpkg --print-architecture).deb"
 sudo dpkg -i /tmp/kubecolor.deb
 
-# update k alias
+# Update the 'k' alias
 sed -i -e s/k='kubectl'/k='kubecolor'/ .zshrc
 
 ```
 
-### Setup kns
+### Install kns
 
 ```bash
 curl -s https://raw.githubusercontent.com/blendle/kns/master/bin/kns -o /tmp/kns && sudo install -v -m 755 /tmp/kns /usr/local/bin/kns && rm -v /tmp/kns
 ```
-### Setup traefik ingress as a DaemonSet
+### Deploy Traefik Ingress as a DaemonSet
 
 ```bash
 helm repo add traefik https://traefik.github.io/charts
@@ -147,14 +145,14 @@ helm upgrade --install traefik traefik/traefik \
   --set resources.limits.memory="128Mi"
 ```
 
-Check that it could be joined on all node with:
+Verify that it can be accessed via all nodes:
 
 ```bash
 curl -I http://node-0
 curl -I http://node-1
 ```
 
-### Setup kyverno
+### Deploy Kyverno
 
 ```bash
 helm upgrade --install kyverno kyverno \
@@ -164,7 +162,7 @@ helm upgrade --install kyverno kyverno \
   --set features.policyExceptions.enabled=true
 ```
 
-### Setup dnsmasq and resolved to resolve *.klab.lan to nodes
+### Configure dnsmasq and systemd-resolved to resolve `*.klab.lan` to nodes
 
 ```bash
 sudo apt install -y dnsmasq dnsutils
@@ -192,7 +190,7 @@ sudo cp /tmp/klab.conf /etc/systemd/resolved.conf.d/
 sudo systemctl restart systemd-resolved
 ```
 
-check with:
+Verify the configuration:
 
 ```bash
 curl -I http://test.test.klab.lan
@@ -206,4 +204,4 @@ Date: Tue, 10 Feb 2026 23:58:24 GMT
 Content-Length: 19
 ```
 
-This config could also be performed on the host to access to nodes from it
+This configuration can also be applied to the host machine, allowing you to access the nodes via the `*.klab.lan` DNS wildcard.
