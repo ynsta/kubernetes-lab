@@ -71,10 +71,23 @@ vagrant ssh jumpbox
 ping 10.4.21.20
 ```
 
-
 ## Kubernetes Setup
 
-Follow the [Kubernetes The Hard Way](https://github.com/ynsta/kubernetes-the-hard-way/tree/1.34.3) guide.
+The Kubernetes installation follows my forked version of the [Kubernetes The Hard Way](https://github.com/ynsta/kubernetes-the-hard-way/tree/1.34.3) guide.
+
+This guide is a **fork** of the original by [kelseyhightower](https://github.com/kelseyhightower/kubernetes-the-hard-way). 
+
+### Key Improvements in this Fork:
+
+* **Updated Versions:** Kubernetes **1.34.3** and other components have been updated to recent versions.
+* **Helm:** Integrated support for the Helm package manager.
+* **API Aggregation Layer:** Enabled to allow for custom API extensions.
+* **DNS:** Pre-configured CoreDNS for service discovery.
+* **Metrics API:** Deployment of the Metrics Server for resource monitoring.
+* **Portmap:** Support for `hostPort` and port mapping functionality.
+
+> [!WARNING]
+> This setup is **not production-ready**. Everything must be performed manually by design. This is intentional to provide a deep understanding and a platform for experimentation with Kubernetes internals.
 
 A [`machines.txt`](machines.txt) file is provided for use with this guide.
 
