@@ -44,7 +44,22 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y -qq curl apt-transport-https wget vim git openssl htop net-tools zsh zplug fzf tmux
+    apt-get install -y -qq \
+      apt-transport-https \
+      conntrack \
+      curl \
+      dnsmasq \
+      dnsutils \
+      fzf \
+      htop \
+      ipset \
+      kmod \
+      net-tools \
+      socat \
+      tmux \
+      wget vim git openssl \
+      zplug \
+      zsh
 
     echo #{SSH_PUB_KEY} >> /home/vagrant/.ssh/authorized_keys
     echo #{SSH_PUB_KEY} >> /root/.ssh/authorized_keys
