@@ -27,7 +27,7 @@ else
 end
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "cloud-image/debian-13" 
+  config.vm.box = "cloud-image/debian-13"
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.ssh.forward_env = false
   config.ssh.forward_agent = true
@@ -44,7 +44,7 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y -qq curl wget vim git openssl htop net-tools zsh zplug fzf tmux
+    apt-get install -y -qq curl apt-transport-https wget vim git openssl htop net-tools zsh zplug fzf tmux
 
     echo #{SSH_PUB_KEY} >> /home/vagrant/.ssh/authorized_keys
     echo #{SSH_PUB_KEY} >> /root/.ssh/authorized_keys
@@ -111,7 +111,7 @@ zplug load
 # fzf history config
 source <(fzf --zsh)
 EOF
-    echo "Configuring tmux for vagrant user..."   
+    echo "Configuring tmux for vagrant user..."
     cat <<"EOF" > /home/vagrant/.tmux.conf
 # Enable Mouse Support (clickable windows, resizable panes)
 set -g mouse on
