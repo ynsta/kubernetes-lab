@@ -1,0 +1,232 @@
+# -----------------------------------------------------------------------------
+# Rook-Ceph Cluster Helm Configuration
+# Target Infrastructure: 3 Kubernetes Nodes
+# Target Storage: 20GB /dev/vdb per node
+# Optimization: Small-scale, highly constrained resources
+# -----------------------------------------------------------------------------
+
+# The namespace where the Rook Operator is installed.
+# This links the Cluster CRD to the active Operator.
+operatorNamespace: rook-ceph
+
+# -----------------------------------------------------------------------------
+# Ceph Cluster Specification
+# Ref: https://rook.io/docs/rook/latest/CRDs/Cluster/ceph-cluster-crd/
+# -----------------------------------------------------------------------------
+cephClusterSpec:
+  # Path on the host where configuration and metadata (like mon maps) are persisted.
+  # If this directory is deleted, the cluster identity is lost.
+  dataDirHostPath: /var/lib/rook
+
+  # Monitor (Mon) Configuration
+  mon:
+    # 3 Monitors are required for a 3-node cluster to maintain quorum (2/3 majority).
+    count: 3
+    # Strictly enforce one monitor per node to ensure failure domain isolation.
+    allowMultiplePerNode: false
+
+  # Manager (Mgr) Configuration
+  mgr:
+    # 2 Managers (Active/Standby) for high availability.
+    count: 2
+    modules:
+      # Enable the dashboard for visualization.
+      - name: dashboard
+        enabled: true
+      # Enable Prometheus for metrics collection.
+      - name: prometheus
+        enabled: true
+
+  # Dashboard Settings
+  dashboard:
+    enabled: true
+    # Disable SSL for internal cluster simplicity (manage via Ingress/Service).
+    ssl: false
+
+  # ---------------------------------------------------------------------------
+  # STORAGE CONFIGURATION (CRITICAL SECTION)
+  # ---------------------------------------------------------------------------
+  storage:
+    # Automatically consider all nodes in the cluster for storage.
+    useAllNodes: true
+    
+    # Do NOT automatically consume all devices. We use a filter for safety.
+    useAllDevices: false
+    
+    # Regex filter to select ONLY the exact device '/dev/vdb'.
+    # '^' anchors the start, '$' anchors the end, preventing matches like 'vdb1'.
+    deviceFilter: "^vdb$"
+    
+    # OSD Configuration Overrides
+    # These settings are essential to bypass the 20GB size limitations.
+    config:
+      # Hardcode the RocksDB (metadata) partition to 1GB.
+      # Without this, heuristics might allocate 4GB+, starving the data partition
+      # or failing the 'minimum size' check for the disk.
+      databaseSizeMB: "1024"
+      
+      # Hardcode the WAL size (legacy safeguard).
+      journalSizeMB: "1024"
+      
+      # Set the Ceph OSD memory target to 2GB (value in bytes).
+      # Prevents OOM kills on small nodes. Default is 4GB.
+      # 1073741824 bytes = 1 GiB
+      osd_memory_target: "1073741824"
+      
+      # Ensure 1 OSD is created per device (Standard for block devices).
+      osdsPerDevice: "1"
+      
+      # Optional: Enable encryption at rest (LUKS).
+      # encryptedDevice: "false"
+
+  healthCheck:
+    daemonHealth:
+      osd:
+        interval: 60s
+      status:
+        interval: 60s
+
+  # ---------------------------------------------------------------------------
+  # Resource Management
+  # ---------------------------------------------------------------------------
+  # These limits ensure that Ceph daemons do not starve the Kubernetes control plane.
+  resources:
+    mon:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        memory: "1Gi"
+    mgr:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        memory: "1Gi"
+    osd:
+      requests:
+        cpu: "200m"
+        # Request should be close to osd_memory_target.
+        memory: "1Gi"
+      limits:
+        # Limit allows for some overhead above the target before throttling/killing.
+        memory: "2Gi"
+
+# -----------------------------------------------------------------------------
+# Ceph Block Pool (RBD)
+# This defines the default storage class for PVCs.
+# -----------------------------------------------------------------------------
+cephBlockPools:
+  - name: ceph-blockpool
+    spec:
+      # Failure domain 'host' ensures replicas are on different nodes.
+      failureDomain: host
+      replicated:
+        # 3 Replicas for full data redundancy.
+        size: 3
+    storageClass:
+      enabled: true
+      name: ceph-block
+      isDefault: true
+      reclaimPolicy: Delete
+      allowVolumeExpansion: true
+      parameters:
+        clusterID: rook-ceph
+        pool: ceph-blockpool
+        imageFormat: "2"
+        imageFeatures: layering
+        csi.storage.k8s.io/provisioner-secret-name: rook-csi-rbd-provisioner
+        csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+        csi.storage.k8s.io/controller-expand-secret-name: rook-csi-rbd-provisioner
+        csi.storage.k8s.io/controller-expand-secret-namespace: rook-ceph
+        csi.storage.k8s.io/node-stage-secret-name: rook-csi-rbd-node
+        csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
+        # XFS is the recommended filesystem for RBD devices.
+        csi.storage.k8s.io/fstype: xfs
+
+# -----------------------------------------------------------------------------
+# Ceph Filesystem (CephFS)
+# -----------------------------------------------------------------------------
+# Optional: Can be disabled (enabled: false) if Shared Filesystem is not needed.
+cephFileSystems:
+  - name: ceph-filesystem
+    spec:
+      metadataPool:
+        replicated:
+          size: 3
+      dataPools:
+        - failureDomain: host
+          replicated:
+            size: 3
+          name: data0
+      metadataServer:
+        activeCount: 1
+        activeStandby: true
+        # MDS Resource Limits
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "1Gi"
+          limits:
+            memory: "2Gi"
+    storageClass:
+      enabled: true
+      name: ceph-filesystem
+      isDefault: false
+      reclaimPolicy: Delete
+      parameters:
+        clusterID: rook-ceph
+        fsName: ceph-filesystem
+        pool: ceph-filesystem-data0
+        csi.storage.k8s.io/provisioner-secret-name: rook-csi-cephfs-provisioner
+        csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+        csi.storage.k8s.io/controller-expand-secret-name: rook-csi-cephfs-provisioner
+        csi.storage.k8s.io/controller-expand-secret-namespace: rook-ceph
+        csi.storage.k8s.io/node-stage-secret-name: rook-csi-cephfs-node
+        csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
+# -----------------------------------------------------------------------------
+# Ceph Object Store (RGW)
+# -----------------------------------------------------------------------------
+# Optional: Can be disabled if S3-compatible storage is not needed.
+cephObjectStores:
+  - name: ceph-objectstore
+    spec:
+      metadataPool:
+        failureDomain: host
+        replicated:
+          size: 3
+      dataPool:
+        failureDomain: host
+        replicated:
+          size: 3
+      gateway:
+        port: 80
+        instances: 1
+        # RGW Resource Limits
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            memory: "1Gi"
+    storageClass:
+      enabled: true
+      name: ceph-bucket
+      reclaimPolicy: Delete
+
+
+# -----------------------------------------------------------------------------
+# Rook-Ceph Toolbox
+# Provides a dedicated client container for running Ceph CLI commands securely
+# -----------------------------------------------------------------------------
+toolbox:
+  enabled: true
+  # We should add small resource limits here too, 
+  # to align with your highly constrained 3-node environment.
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"

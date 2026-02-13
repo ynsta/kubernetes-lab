@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ceph-dashboard-ingress
+  namespace: rook-ceph
+  annotations:
+    # Telling Traefik to listen on the standard HTTP web entrypoint
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: dashboard.ceph.klab.lan  # <-- You can change this to whatever URL you prefer
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            # This is the built-in service Rook already created for you
+            name: rook-ceph-mgr-dashboard
+            port:
+              number: 7000  # Port 7000 is used because ssl: false is set

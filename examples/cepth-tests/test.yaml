@@ -1,0 +1,98 @@
+# ---------------------------------------------------------
+# 1. Block Storage Test (RBD - ReadWriteOnce)
+# ---------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rbd-pvc-test
+spec:
+  accessModes: [ "ReadWriteOnce" ]
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rbd-test-pod
+spec:
+  containers:
+  - name: busybox
+    image: busybox:latest
+    command: ["/bin/sh", "-c", "echo 'Hello from Block Storage!' > /mnt/rbd/test.txt && sleep 3600"]
+    volumeMounts:
+    - mountPath: /mnt/rbd
+      name: rbd-vol
+  volumes:
+  - name: rbd-vol
+    persistentVolumeClaim:
+      claimName: rbd-pvc-test
+
+---
+# ---------------------------------------------------------
+# 2. Shared Filesystem Test (CephFS - ReadWriteMany)
+# ---------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cephfs-pvc-test
+spec:
+  accessModes: [ "ReadWriteMany" ]
+  storageClassName: ceph-filesystem
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cephfs-test-pod
+spec:
+  containers:
+  - name: busybox
+    image: busybox:latest
+    command: ["/bin/sh", "-c", "echo 'Hello from Shared Filesystem!' > /mnt/cephfs/test.txt && sleep 3600"]
+    volumeMounts:
+    - mountPath: /mnt/cephfs
+      name: cephfs-vol
+  volumes:
+  - name: cephfs-vol
+    persistentVolumeClaim:
+      claimName: cephfs-pvc-test
+
+---
+# ---------------------------------------------------------
+# 3. Object Storage Test (RGW/S3 Bucket)
+# ---------------------------------------------------------
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: s3-bucket-test
+spec:
+  generateBucketName: test-bucket
+  storageClassName: ceph-bucket
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: s3-test-pod
+spec:
+  containers:
+  - name: aws-cli
+    image: amazon/aws-cli:latest
+    command: ["/bin/sh", "-c"]
+    # This script writes a file and uploads it to your new Ceph S3 bucket
+    args:
+      - |
+        echo "Hello from S3 Object Storage!" > /tmp/s3-test.txt
+        aws s3 --endpoint-url http://$BUCKET_HOST:$BUCKET_PORT cp /tmp/s3-test.txt s3://$BUCKET_NAME/s3-test.txt
+        echo "File successfully uploaded to bucket: $BUCKET_NAME"
+        sleep 3600
+    envFrom:
+    # The Rook Operator automatically creates this secret and configmap 
+    # when the ObjectBucketClaim is created!
+    - secretRef:
+        name: s3-bucket-test
+    - configMapRef:
+        name: s3-bucket-test

@@ -3,11 +3,12 @@
 
 # --- CONFIGURATION VARIABLES ---
 # We define our nodes here. If you want 5 workers later, just change "2" to "5".
-WORKER_COUNT = 2
+WORKER_COUNT = 3
 NETWORK_PREFIX = "10.4.21"
 # Disk Sizes
-DISK_SIZE_GB_JUMP = 20
-DISK_SIZE_GB_K8S  = 40
+DISK_SIZE_GB_JUMP  = 20
+DISK_SIZE_GB_K8S   = 30
+DISK_SIZE_GB_ROOKS = 20
 
 # List your preferred keys in order of priority
 possible_keys = [
@@ -51,15 +52,18 @@ Vagrant.configure("2") do |config|
       dnsmasq \
       dnsutils \
       fzf \
+      git \
       htop \
       ipset \
       kmod \
       net-tools \
+      openssl \
       socat \
       tmux \
-      wget vim git openssl \
-      zplug \
-      zsh
+      vim \
+      wget \
+      xfsdump \
+      xfsprogs
 
     echo #{SSH_PUB_KEY} >> /home/vagrant/.ssh/authorized_keys
     echo #{SSH_PUB_KEY} >> /root/.ssh/authorized_keys
@@ -74,11 +78,46 @@ Vagrant.configure("2") do |config|
       systemctl restart sshd
     fi
 
-    echo "Configuring zsh as default for vagrant user..."
-    chsh -s $(which zsh) vagrant
-    cat <<"EOF" > /home/vagrant/.zshrc
+    echo "Configuring tmux for vagrant user..."
+    cat <<"EOF" > /home/vagrant/.tmux.conf
+# Enable Mouse Support (clickable windows, resizable panes)
+set -g mouse on
+
+# Easy Config Reload (Press Prefix + r)
+bind r source-file ~/.tmux.conf \; display "Reloaded!"
+
+# Easier split commands
+bind '-' split-window -h
+bind '=' split-window -v
+unbind '"'
+unbind '%'
+
+# Start window numbering at 1 instead of 0
+set -g base-index 1
+setw -g pane-base-index 1
+EOF
+
+  chown -R vagrant:vagrant /home/vagrant
+  SHELL
+
+  # --- VM 1: JUMPBOX ---
+  config.vm.define "jumpbox" do |cfg|
+    cfg.vm.hostname = "jumpbox"
+    cfg.vm.network "private_network", ip: "#{NETWORK_PREFIX}.80"
+    cfg.vm.provider :libvirt do |v|
+      v.memory = 1024
+      v.cpus = 1
+      v.machine_virtual_size = DISK_SIZE_GB_JUMP
+    end
+
+    cfg.vm.provision "shell", inline: <<-SHELL
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get install -y -qq zsh zplug
+
+      echo "Configuring zsh as default for vagrant user..."
+      chsh -s $(which zsh) vagrant
+      cat <<"EOF" > /home/vagrant/.zshrc
 # Aliases
-alias k='kubectl'
 alias la='ls -lah --color=auto'
 alias ls='ls --color=auto'
 alias grep='grep --color=auto'
@@ -115,7 +154,7 @@ zplug "zsh-users/zsh-autosuggestions"
 zplug "zsh-users/zsh-history-substring-search"
 zplug "zsh-users/zsh-completions"
 zplug "junegunn/fzf"
-zplug "themes/robbyrussell", from:oh-my-zsh, as:theme   # Theme
+zplug "themes/robbyrussell", from:oh-my-zsh, as:theme
 
 # zplug - install/load new plugins when zsh is started or reloaded
 if ! zplug check; then
@@ -125,38 +164,42 @@ zplug load
 
 # fzf history config
 source <(fzf --zsh)
+
+# kubectl config
+[ -x "$(command -v kubectl)" ] && { 
+  source <(kubectl completion zsh)
+  
+  if [ -x "$(command -v kubecolor)" ]; then
+    alias k='kubecolor'
+    # Make completion work when typing the full 'kubecolor' command
+    compdef _kubectl kubecolor 
+  else
+    alias k='kubectl'
+  fi
+  
+  # Make completion work when typing the 'k' alias
+  compdef _kubectl k 
+}
+
+# helm config
+[ -x "$(command -v helm)" ] && {
+  source <(helm completion zsh)
+  alias h='helm'
+  compdef _helm h
+}
+
+# Set krew in path if installed
+[ -d ${KREW_ROOT:-$HOME/.krew}/bin ] && export PATH="$PATH:${KREW_ROOT:-$HOME/.krew}/bin"
+
 EOF
-    echo "Configuring tmux for vagrant user..."
-    cat <<"EOF" > /home/vagrant/.tmux.conf
-# Enable Mouse Support (clickable windows, resizable panes)
-set -g mouse on
-
-# Easy Config Reload (Press Prefix + r)
-bind r source-file ~/.tmux.conf \; display "Reloaded!"
-
-# Easier split commands
-bind '-' split-window -h
-bind '=' split-window -v
-unbind '"'
-unbind '%'
-
-# Start window numbering at 1 instead of 0
-set -g base-index 1
-setw -g pane-base-index 1
-EOF
-
-  chown -R vagrant:vagrant /home/vagrant
-  SHELL
-
-  # --- VM 1: JUMPBOX ---
-  config.vm.define "jumpbox" do |cfg|
-    cfg.vm.hostname = "jumpbox"
-    cfg.vm.network "private_network", ip: "#{NETWORK_PREFIX}.80"
-    cfg.vm.provider :libvirt do |v|
-      v.memory = 1024
-      v.cpus = 1
-      v.machine_virtual_size = DISK_SIZE_GB_JUMP
-    end
+      chown vagrant:vagrant /home/vagrant/.zshrc
+      
+      # Run zsh once as vagrant user to trigger zplug installation
+      # We use 'script' to fake a TTY which is often needed for interactive shell tools
+      # and we run zsh in interactive mode (-i) to source .zshrc
+      echo "Pre-installing zplug plugins..."
+      su - vagrant -c "script -q /dev/null -c 'zsh -is </dev/null'" || true
+    SHELL
   end
 
   # --- VM 2: SERVER (Control Plane) ---
@@ -164,13 +207,13 @@ EOF
     cfg.vm.hostname = "server"
     cfg.vm.network "private_network", ip: "#{NETWORK_PREFIX}.19"
     cfg.vm.provider :libvirt do |v|
-      v.memory = 4096
+      v.memory = 2048
       v.cpus = 2
       v.machine_virtual_size = DISK_SIZE_GB_K8S
     end
   end
 
-  # --- VM 3 & 4: WORKERS (LOOP) ---
+  # --- WORKERS (LOOP) ---
   # Ruby loop to create node-0, node-1, node-2, etc.
   (0..WORKER_COUNT-1).each do |i|
     config.vm.define "node-#{i}" do |cfg|
@@ -178,9 +221,10 @@ EOF
       # IP calculation: Starts at .20
       cfg.vm.network "private_network", ip: "#{NETWORK_PREFIX}.#{20 + i}"
       cfg.vm.provider :libvirt do |v|
-        v.memory = 4096
-        v.cpus = 2
+        v.memory = 8192
+        v.cpus = 4
         v.machine_virtual_size = DISK_SIZE_GB_K8S
+        v.storage :file, :size => "#{DISK_SIZE_GB_ROOKS}G"
       end
     end
   end
