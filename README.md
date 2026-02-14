@@ -92,11 +92,8 @@ This guide is a **fork** of the original by [kelseyhightower](https://github.com
 
 A [`machines.txt`](machines.txt) file is provided for use with this guide.
 
-## Post-installation
 
-Perform the following steps on the `jumpbox`:
-
-### Set up the Krew plugin manager
+## Set up the Krew plugin manager
 
 ```bash
 (
@@ -112,7 +109,7 @@ Perform the following steps on the `jumpbox`:
 
 You need to reload your shell and check that krew bin directory is in your PATH (done in vagrant zsh config)
 
-### Install useful plugins
+## Install useful plugins
 
 ```bash
 k krew update
@@ -123,7 +120,7 @@ k resource-capacity -u
 k view-allocations -u
 ```
 
-### Install and configure kubecolor
+## Install and configure kubecolor
 
 ```bash
 # Kubecolor
@@ -131,12 +128,13 @@ wget -O /tmp/kubecolor.deb "https://kubecolor.github.io/packages/deb/pool/main/k
 sudo dpkg -i /tmp/kubecolor.deb
 ```
 
-### Install kns
+## Install kns
 
 ```bash
 curl -s https://raw.githubusercontent.com/blendle/kns/master/bin/kns -o /tmp/kns && sudo install -v -m 755 /tmp/kns /usr/local/bin/kns && rm -v /tmp/kns
 ```
-### Deploy Traefik Ingress as a DaemonSet
+
+## Deploy Traefik Ingress as a DaemonSet
 
 ```bash
 helm repo add traefik https://traefik.github.io/charts
@@ -160,7 +158,7 @@ curl -I http://node-1
 curl -I http://node-2
 ```
 
-### Deploy Kyverno
+## Deploy Kyverno
 
 ```bash
 helm upgrade --install kyverno kyverno \
@@ -171,7 +169,7 @@ helm upgrade --install kyverno kyverno \
   --set features.policyExceptions.enabled=true
 ```
 
-### Configure dnsmasq and systemd-resolved to resolve `*.klab.lan` to nodes
+## Configure dnsmasq and systemd-resolved to resolve `*.klab.lan` to nodes
 
 ```bash
 sudo apt install -y dnsmasq dnsutils
@@ -216,21 +214,22 @@ Content-Length: 19
 
 This configuration can also be applied to the host machine, allowing you to access the nodes via the `*.klab.lan` DNS wildcard.
 
-### Deploy ceph with rook
+## Deploy ceph with rook
 
-#### Repository Configuration
+### Repository Configuration
 
 ```bash
 helm repo add rook-release https://charts.rook.io/release
 helm repo update
 ```
 
-#### Deploying the Operator
+### Deploying the Operator
 
 The operator is the control plane. It must be installed and running before any cluster configuration is applied.
 
 ```bash
-helm upgrade --install --create-namespace --namespace rook-ceph rook-ceph rook-release/rook-ceph
+helm upgrade --install --create-namespace --namespace rook-ceph rook-ceph rook-release/rook-ceph \
+  -f configs/rook-ceph/operator-values.yaml 
 ```
 
 Verification: Wait until the operator pod is in the Running state:
@@ -240,20 +239,20 @@ kubectl klock pods -n rook-ceph -l app=rook-ceph-operator
 ```
 
 
-#### Deploying the Cluster
+### Deploying the Cluster
 
 Apply the custom values.yaml to the cluster chart. This instructs the operator to build the Ceph cluster according to our 3-node, 20GB specification.
 
 ```bash
 helm upgrade --install --create-namespace --namespace rook-ceph rook-ceph-cluster \
-  --set operatorNamespace=rook-ceph rook-release/rook-ceph-cluster -f configs/rook-ceph/values.yaml
+  --set operatorNamespace=rook-ceph rook-release/rook-ceph-cluster -f configs/rook-ceph/cluster-values.yaml
 ```
 
-#### Verification and Health Checks
+### Verification and Health Checks
 
 Post-deployment, verification is essential to confirm that the deviceFilter worked and the databaseSizeMB override prevented the "device too small" error.
 
-##### OSD Pod Status:
+#### OSD Pod Status:
 
 Check for the presence of three OSD pods.
 
@@ -263,7 +262,7 @@ kubectl klock pods -n rook-ceph -l app=rook-ceph-osd
 
 You should see rook-ceph-osd-0, rook-ceph-osd-1, and rook-ceph-osd-2.
 
-##### OSD Preparation Logs:
+#### OSD Preparation Logs:
 
 If OSD pods are missing, check the preparation jobs. These jobs run the ceph-volume logic.
 
@@ -273,7 +272,7 @@ Success Indicator: Logs showing Provisioning device /dev/vdb followed by success
 Failure Indicator: Logs showing skipping device "vdb": ["Insufficient space"] or skipping device "vdb": ["Locked"].
 ```
 
-##### Ceph Cluster Status:
+#### Ceph Cluster Status:
 Access the Ceph status via the operator (or a toolbox pod).
 
 ```bash
@@ -304,7 +303,7 @@ kubectl -n rook-ceph exec -it deploy/rook-ceph-tools -- ceph status
 ```
 
 
-#### Test all kind of storage
+### Test all kind of storage
 
 ```bash
 kubectl apply -f examples/cepth-tests/test.yaml
@@ -321,7 +320,7 @@ cephfs-pvc-test   Bound    pvc-d9a9b436-d20a-4525-891e-220ecbfa108e   1Gi       
 rbd-pvc-test      Bound    pvc-6d883466-43aa-4fe5-80c9-f4ec01515de3   1Gi        RWO            ceph-block        <unset>                 4m22s
 ```
 
-##### Test Block Storage (RBD)
+#### Test Block Storage (RBD)
 
 
 Run this command to read the file from the Block volume:
@@ -333,7 +332,7 @@ kubectl exec rbd-test-pod -- cat /mnt/rbd/test.txt
 
 **Expected output:** `Hello from Block Storage!`
 
-##### Test Shared Filesystem (CephFS)
+#### Test Shared Filesystem (CephFS)
 
 Run this command to read the file from the Shared Filesystem volume:
 
@@ -344,7 +343,7 @@ kubectl exec cephfs-test-pod -- cat /mnt/cephfs/test.txt
 
 **Expected output:** `Hello from Shared Filesystem!`
 
-##### Test Object Storage (S3 / RGW)
+#### Test Object Storage (S3 / RGW)
 
 For the S3 bucket, we will actually ask the AWS CLI inside the pod to talk to the Ceph Object Gateway, list the contents of the bucket, and then download and print the file.
 
@@ -368,7 +367,7 @@ kubectl exec s3-test-pod -- sh -c 'aws s3 --endpoint-url http://$BUCKET_HOST:$BU
 
 ---
 
-##### Clean up
+#### Clean up
 
 If all of those returned exactly what we expected, your K3s/K8s cluster is now fully integrated with Ceph!
 
@@ -378,7 +377,7 @@ To clean up the test resources so they don't consume your precious capacity, jus
 kubectl delete -f ceph-test.yaml
 ```
 
-#### Expose the dashboard with and ingress
+### Expose ceph dashboard with an ingress
 
 ```bash
 kubectl apply -f examples/cepth-tests/dashboard-ingress.yaml
@@ -395,7 +394,149 @@ Get your password with:
 kubectl -n rook-ceph get secret rook-ceph-dashboard-password -o jsonpath="{['data']['password']}" | base64 --decode && echo
 ```
 
-## 📚 Examples
+### rados benchmark
+
+Open a shell in rook-ceph-tool
+
+```bash
+kubectl -n rook-ceph exec -it deploy/rook-ceph-tools -- bash
+```
+
+To restrict the benchmark to a maximum of 10GB, we will create a dedicated test pool, apply a byte limit (quota) to it, and then run the benchmark. The tool will automatically halt/error out once the pool hits the 15GB threshold.
+
+```bash
+# 1. Create a dedicated pool for benchmarking
+ceph osd pool create testbench 128 128
+
+# 2. Enforce a strict 10GB maximum quota on the pool
+ceph osd pool set-quota testbench max_bytes 10G
+
+# 3. Run the write benchmark 
+rados bench -p testbench 15 write -b 4M -t 16 --no-cleanup
+
+# Run the read benchmark 
+rados bench -p testbench 15 seq -t 16
+
+# Cleanup
+rados -p testbench cleanup
+```
+
+> **Note 1:** We use `--no-cleanup` so the 10GB of data remains in the pool, allowing you to run subsequent read tests against that specific data block.
+> **Note 2:** If the clean up get stuck it might be that the OSD are full see bellow. 
+
+---
+
+#### Emergency Cleanup: When the Disk is Completely Full
+
+If a benchmark runs unbounded and fills your underlying OSD disks to their `full_ratio` capacity (default is 95%), Ceph will automatically trigger a hard safety lock.
+
+
+When Ceph hits its full ratio, it **blocks all write operations** to prevent database corruption. However, deleting data in Ceph actually requires *writing* deletion metadata (tombstones) to the OSDs. Because writes are globally blocked, your `rados cleanup` or pool deletion commands will simply hang indefinitely.
+
+To clear the full disks, you must temporarily raise the full-ratio limit. This gives Ceph enough artificial "breathing room" to process the deletion metadata so you can nuke the data and re-engage the safety lock.
+
+**Step 1: Verify the cluster is locked due to full OSDs**
+
+```bash
+ceph -s
+```
+
+*(You will see a `HEALTH_ERR` state with a warning like `OSD_FULL: 1 full osd(s)`).*
+
+**Step 2: Temporarily raise the full ratio to 99%**
+This tricks the cluster into thinking it has free space, allowing writes (and deletes) to process.
+
+```bash
+ceph osd set-full-ratio 0.99
+```
+
+*Wait a few seconds. Run `ceph -s` again until the cluster drops to `HEALTH_WARN` (nearfull).*
+
+**Step 3: Delete the benchmark data**
+You can now successfully run your cleanup commands without them hanging:
+
+```bash
+# Option A: Clean up the benchmark objects safely
+rados -p testbench cleanup
+
+# Option B: Delete the entire pool (Much faster for large amounts of data)
+ceph tell mon.* injectargs '--mon-allow-pool-delete=true'
+ceph osd pool delete testbench testbench --yes-i-really-really-mean-it
+ceph tell mon.* injectargs '--mon-allow-pool-delete=false'
+```
+
+**Step 4: CRITICAL - Revert the safety limits**
+Once `ceph osd df` confirms your storage space has been reclaimed, you **must** reset the cluster's safety lock to prevent catastrophic crashes in the future.
+
+```bash
+ceph osd set-full-ratio 0.95
+```
+
+
+## Install kubestr
+
+[Kubestr](https://github.com/kastenhq/kubestr) is a collection of tools to discover, validate and evaluate your kubernetes storage options.
+
+```bash
+{
+  wget https://github.com/kastenhq/kubestr/releases/download/v0.4.49/kubestr_0.4.49_Linux_amd64.tar.gz
+  tar -xzf kubestr_0.4.49_Linux_amd64.tar.gz kubestr
+  sudo install -v -m 755 kubestr /usr/local/bin/
+  rm kubestr_0.4.49_Linux_amd64.tar.gz kubestr
+}
+```
+
+Run a fio test:
+
+```bash
+kubestr fio -s ceph-block --size 10Gi
+```
+
+
+```text
+PVC created kubestr-fio-pvc-qxct6
+Pod created kubestr-fio-pod-z4pxh
+Running FIO test (default-fio) on StorageClass (ceph-block) with a PVC of Size (10Gi)
+Elapsed time- 31.005216056s
+FIO test results:
+  
+FIO version - fio-3.36
+Global options - ioengine=libaio verify=0 direct=1 gtod_reduce=1
+
+JobName: read_iops
+  blocksize=4K filesize=2G iodepth=64 rw=randread
+read:
+  IOPS=4516.090332 BW(KiB/s)=18081
+  iops: min=3948 max=5351 avg=4545.344727
+  bw(KiB/s): min=15792 max=21405 avg=18182.035156
+
+JobName: write_iops
+  blocksize=4K filesize=2G iodepth=64 rw=randwrite
+write:
+  IOPS=1384.712402 BW(KiB/s)=5555
+  iops: min=1151 max=2632 avg=1391.586182
+  bw(KiB/s): min=4606 max=10530 avg=5567.275879
+
+JobName: read_bw
+  blocksize=128K filesize=2G iodepth=64 rw=randread
+read:
+  IOPS=4216.318848 BW(KiB/s)=540225
+  iops: min=3394 max=5010 avg=4247.655273
+  bw(KiB/s): min=434432 max=641280 avg=543731.687500
+
+JobName: write_bw
+  blocksize=128k filesize=2G iodepth=64 rw=randwrite
+write:
+  IOPS=1337.141357 BW(KiB/s)=171689
+  iops: min=1139 max=2278 avg=1344.379272
+  bw(KiB/s): min=145884 max=291584 avg=172116.687500
+
+Disk stats (read/write):
+  rbd0: ios=146995/45202 merge=0/12 ticks=1862837/2004973 in_queue=3867810, util=99.568275%
+  -  OK
+```
+
+## Some Examples
 
 Explore practical use cases for your Kubernetes lab:
 

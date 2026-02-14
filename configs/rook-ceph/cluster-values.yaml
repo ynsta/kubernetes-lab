@@ -93,19 +93,19 @@ cephClusterSpec:
   resources:
     mon:
       requests:
-        cpu: "100m"
-        memory: "256Mi"
+        cpu: "50m"
+        memory: "384Mi"
       limits:
-        memory: "1Gi"
+        memory: "512Mi"
     mgr:
       requests:
-        cpu: "100m"
-        memory: "256Mi"
+        cpu: "50m"
+        memory: "384Mi"
       limits:
-        memory: "1Gi"
+        memory: "512Mi"
     osd:
       requests:
-        cpu: "200m"
+        cpu: "100m"
         # Request should be close to osd_memory_target.
         memory: "1Gi"
       limits:
@@ -165,10 +165,10 @@ cephFileSystems:
         # MDS Resource Limits
         resources:
           requests:
-            cpu: "200m"
-            memory: "1Gi"
+            cpu: "50m"
+            memory: "128Mi"
           limits:
-            memory: "2Gi"
+            memory: "1Gi"
     storageClass:
       enabled: true
       name: ceph-filesystem
@@ -205,8 +205,8 @@ cephObjectStores:
         # RGW Resource Limits
         resources:
           requests:
-            cpu: "200m"
-            memory: "512Mi"
+            cpu: "50m"
+            memory: "256Mi"
           limits:
             memory: "1Gi"
     storageClass:

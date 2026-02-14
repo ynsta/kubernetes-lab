@@ -1,0 +1,123 @@
+# configs/rook-ceph/operator-values.yaml
+
+# 1. Tune the Rook Operator Pod itself
+resources:
+  requests:
+    cpu: 50m      # Actual use in your lab is ~3m!
+    memory: 128Mi # Actual use is ~107Mi
+  limits:
+    memory: 512Mi
+
+# 2. Tune all the CSI sidecars
+csi:
+  # -------------------------------------------------------------------------
+  # RBD (Block Storage) CSI Tuning
+  # -------------------------------------------------------------------------
+  csiRBDPluginResource: |
+    - name: driver-registrar
+      resource:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 64Mi
+    - name: csi-rbdplugin
+      resource:
+        requests:
+          cpu: 20m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+          
+  csiRBDProvisionerResource: |
+    - name: csi-provisioner
+      resource:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+    - name: csi-resizer
+      resource:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+    - name: csi-attacher
+      resource:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+    - name: csi-snapshotter
+      resource:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+    - name: csi-rbdplugin
+      resource:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+
+  # -------------------------------------------------------------------------
+  # CephFS (Shared Filesystem) CSI Tuning
+  # -------------------------------------------------------------------------
+  csiCephFSPluginResource: |
+    - name: driver-registrar
+      resource:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 64Mi
+    - name: csi-cephfsplugin
+      resource:
+        requests:
+          cpu: 20m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+          
+  csiCephFSProvisionerResource: |
+    - name: csi-provisioner
+      resource:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+    - name: csi-resizer
+      resource:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+    - name: csi-attacher
+      resource:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+    - name: csi-snapshotter
+      resource:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+    - name: csi-cephfsplugin
+      resource:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
