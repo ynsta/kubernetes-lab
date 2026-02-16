@@ -426,6 +426,8 @@ rados -p testbench cleanup
 
 ---
 
+### Operations
+
 #### Emergency Cleanup: When the Disk is Completely Full
 
 If a benchmark runs unbounded and fills your underlying OSD disks to their `full_ratio` capacity (default is 95%), Ceph will automatically trigger a hard safety lock.
@@ -471,6 +473,53 @@ Once `ceph osd df` confirms your storage space has been reclaimed, you **must** 
 ```bash
 ceph osd set-full-ratio 0.95
 ```
+
+---
+
+#### Resolving Helm Conflicts on Rook-Ceph Config Changes
+
+**The Issue**
+When running a standard `helm upgrade` for Rook-Ceph with:
+
+```bash
+helm upgrade --install --namespace rook-ceph rook-ceph-cluster \
+  --set operatorNamespace=rook-ceph rook-release/rook-ceph-cluster \
+  -f configs/rook-ceph/cluster-values.yaml
+```
+
+You might encounter a Kubernetes Server-Side Apply (SSA) conflict. This typically happens if a resource (such as `CephCluster` resource limits) was previously modified manually using `kubectl edit` or `kubectl patch`. Kubernetes reassigns ownership of those fields to `kubectl`, causing Helm to reject future updates to prevent accidental overwrites.
+
+**The Error**
+
+```text
+level=WARN msg="upgrade failed" name=rook-ceph-cluster error="conflict occurred while applying object rook-ceph/rook-ceph ceph.rook.io/v1, Kind=CephCluster: Apply failed with 1 conflict: conflict with \"kubectl\": <field_name>"
+Error: UPGRADE FAILED: conflict occurred while applying object rook-ceph/rook-ceph ceph.rook.io/v1, Kind=CephCluster: Apply failed with 1 conflict: conflict with "kubectl": <field_name>
+```
+
+**The Solution (Template & Force Apply)**
+
+To forcefully overwrite the conflicting fields and reassert your `values.yaml` as the source of truth, bypass Helm's internal deployment mechanism and force the change directly through the Kubernetes API:
+
+```bash
+# Render the Helm chart to a local manifest file
+helm template rook-ceph-cluster rook-release/rook-ceph-cluster \
+  --namespace rook-ceph \
+  --set operatorNamespace=rook-ceph \
+  -f configs/rook-ceph/cluster-values.yaml > temp-ceph-update.yaml
+
+# Force apply the changes, overriding field ownership conflicts
+kubectl apply -f temp-ceph-update.yaml --server-side --force-conflicts
+
+# Clean up the temporary manifest
+rm temp-ceph-update.yaml
+
+# Retry the Helm and take back ownership
+helm upgrade --install --take-ownership --namespace rook-ceph rook-ceph-cluster \
+  --set operatorNamespace=rook-ceph rook-release/rook-ceph-cluster \
+  -f configs/rook-ceph/cluster-values.yaml
+```
+
+> **Note on Helm State:** Because this method uses `kubectl` to apply the changes, Helm's internal release history will not record this update. So, at the end, we run again `helm upgrade` command with `--take-ownership` flag to bring Helm back into sync.
 
 
 ## Install kubestr
