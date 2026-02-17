@@ -68,11 +68,16 @@ cephClusterSpec:
       # Hardcode the WAL size (legacy safeguard).
       journalSizeMB: "1024"
       
-      # Set the Ceph OSD memory target to 2GB (value in bytes).
+      # Set the Ceph OSD memory target to 1.5GB (value in bytes).
       # Prevents OOM kills on small nodes. Default is 4GB.
-      # 1073741824 bytes = 1 GiB
-      osd_memory_target: "1073741824"
+      # 1610612736 bytes = 1.5 GiB
+      osd_memory_target: "1610612736"
       
+      # Reduces log verbosity to save CPU/Memory
+      debug_osd: "0/0"
+      debug_mon: "0/0"
+      debug_mgr: "0/0"
+
       # Ensure 1 OSD is created per device (Standard for block devices).
       osdsPerDevice: "1"
       
@@ -94,24 +99,36 @@ cephClusterSpec:
     mon:
       requests:
         cpu: "50m"
-        memory: "384Mi"
-      limits:
         memory: "512Mi"
+      limits:
+        memory: "1Gi"
     mgr:
       requests:
         cpu: "50m"
-        memory: "384Mi"
+        memory: "256Mi"
       limits:
         memory: "1Gi"
+        cpu: "1000m"
     osd:
       requests:
         cpu: "100m"
         # Request should be close to osd_memory_target.
-        memory: "1Gi"
+        memory: "2Gi"
       limits:
         # Limit allows for some overhead above the target before throttling/killing.
         memory: "2Gi"
-
+    prepareosd:
+      requests:
+        memory: "50Mi"
+      limits:
+        memory: "500Mi"
+    logcollector:
+      limits:
+        memory: "64Mi"
+        cpu: "100m"
+      requests:
+        memory: "10Mi"
+        cpu: "10m"
 # -----------------------------------------------------------------------------
 # Ceph Block Pool (RBD)
 # This defines the default storage class for PVCs.
@@ -165,10 +182,11 @@ cephFileSystems:
         # MDS Resource Limits
         resources:
           requests:
-            cpu: "50m"
+            cpu: "100m"
             memory: "128Mi"
           limits:
-            memory: "1Gi"
+            cpu: "500m"
+            memory: "512Mi"
     storageClass:
       enabled: true
       name: ceph-filesystem
@@ -204,11 +222,12 @@ cephObjectStores:
         instances: 1
         # RGW Resource Limits
         resources:
-          requests:
-            cpu: "50m"
-            memory: "256Mi"
           limits:
-            memory: "1Gi"
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
     storageClass:
       enabled: true
       name: ceph-bucket
